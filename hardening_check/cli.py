@@ -139,6 +139,16 @@ def build_parser() -> argparse.ArgumentParser:
         dest="json_output",
         help="Output results as JSON instead of a table.",
     )
+    parser.add_argument(
+        "--fail-under",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "Exit 1 if any binary scores below N out of 4. "
+            "Use this to gate a CI pipeline on hardening coverage."
+        ),
+    )
     return parser
 
 
@@ -157,6 +167,20 @@ def main(argv: list[str] | None = None) -> None:
     # Exit non-zero if any binary had an error
     if any(r.error for r in results):
         sys.exit(1)
+
+    # Policy gate: only meaningful for files that actually parsed as ELF.
+    if args.fail_under is not None:
+        failing = [
+            r for r in results if r.is_elf and _score(r) < args.fail_under
+        ]
+        if failing:
+            for r in failing:
+                print(
+                    f"FAIL {r.path}: score {_score(r)}/4 "
+                    f"(threshold {args.fail_under})",
+                    file=sys.stderr,
+                )
+            sys.exit(1)
 
 
 if __name__ == "__main__":

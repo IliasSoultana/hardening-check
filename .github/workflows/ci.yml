@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test and self-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install
+        run: uv sync --all-extras --dev
+
+      - name: Unit tests
+        run: uv run pytest -q
+
+      # The unit tests run against synthetic ELF headers. This step points the
+      # scanner at the runner's real binaries, which is the only way to catch
+      # parser assumptions that hold for fixtures but not for production files.
+      - name: Scan system binaries
+        run: |
+          uv run hardening-check /usr/bin/ls /usr/bin/ssh /bin/bash
+          uv run hardening-check --json /usr/bin/ls
+
+      # Demonstrates the gate the tool exists for: a deliberately weak binary
+      # must stop the pipeline, a hardened one must not.
+      - name: Policy gate
+        run: |
+          set -e
+          echo 'int main(void){return 0;}' > weak.c
+          cc -no-pie -fno-stack-protector -z norelro -z execstack -o weak weak.c
+          cc -pie -fstack-protector-strong -Wl,-z,relro,-z,now -o hardened weak.c
+
+          echo "hardened binary must pass a 4/4 gate:"
+          uv run hardening-check --fail-under 4 hardened
+
+          echo "weak binary must fail a 4/4 gate:"
+          if uv run hardening-check --fail-under 4 weak; then
+            echo "::error::weak binary passed the gate; the gate is broken"
+            exit 1
+          fi
+          echo "gate behaved correctly"
