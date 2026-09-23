@@ -36,9 +36,21 @@ jobs:
       - name: Policy gate
         run: |
           set -e
-          echo 'int main(void){return 0;}' > weak.c
-          cc -no-pie -fno-stack-protector -z norelro -z execstack -o weak weak.c
-          cc -pie -fstack-protector-strong -Wl,-z,relro,-z,now -o hardened weak.c
+          # The function needs a stack buffer, otherwise -fstack-protector-strong
+          # has nothing to protect and emits no canary -- which would make the
+          # "hardened" binary score 3/4 and fail its own gate.
+          cat > sample.c <<'SRC'
+          #include <string.h>
+          int main(int argc, char **argv) {
+              char buf[64];
+              strncpy(buf, argc > 1 ? argv[1] : "", sizeof buf - 1);
+              buf[sizeof buf - 1] = '\0';
+              return buf[0];
+          }
+          SRC
+          sed -i 's/^          //' sample.c
+          cc -no-pie -fno-stack-protector -z norelro -z execstack -o weak sample.c
+          cc -pie -fstack-protector-strong -Wl,-z,relro,-z,now -o hardened sample.c
 
           echo "hardened binary must pass a 4/4 gate:"
           uv run hardening-check --fail-under 4 hardened
