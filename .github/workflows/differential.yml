@@ -1,0 +1,109 @@
+name: Differential
+
+# Runs the Python, Go and Rust implementations over the same binaries and
+# reports where they disagree. The three were written independently against
+# three ELF libraries; any divergence is either a bug in one of them or a
+# definition that needs documenting.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  compare:
+    name: Cross-check the three implementations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: hardening-check
+
+      - uses: actions/checkout@v5
+        with:
+          repository: IliasSoultana/elfharden
+          path: elfharden
+
+      - uses: actions/checkout@v5
+        with:
+          repository: IliasSoultana/elfharden-rs
+          path: elfharden-rs
+
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build all three
+        run: |
+          set -e
+          (cd hardening-check && uv sync --dev)
+          (cd elfharden && go build -o elfharden .)
+          (cd elfharden-rs && cargo build --release)
+
+      - name: Collect results
+        run: |
+          set -e
+          # A deliberately mixed corpus: executables, shared libraries and the
+          # dynamic loader. Shared libraries are where the PIE definitions are
+          # expected to diverge.
+          CORPUS=$(ls /usr/bin/ls /usr/bin/ssh /bin/bash \
+                      /usr/lib/x86_64-linux-gnu/libc.so.6 \
+                      /usr/lib/x86_64-linux-gnu/libz.so.1 2>/dev/null | tr '\n' ' ')
+          echo "corpus: $CORPUS"
+
+          (cd hardening-check && uv run hardening-check --json $CORPUS) > py.json
+          ./elfharden/elfharden --json $CORPUS > go.json
+          ./elfharden-rs/target/release/elfharden-rs --json $CORPUS > rs.json
+
+          echo "--- python ---"; cat py.json
+          echo "--- go ---";     cat go.json
+          echo "--- rust ---";   cat rs.json
+
+      - name: Report disagreements
+        run: |
+          python3 - <<'PY'
+          import json, sys
+
+          def load(path):
+              return json.load(open(path))
+
+          py, go, rs = load("py.json"), load("go.json"), load("rs.json")
+
+          def index(rows):
+              out = {}
+              for r in rows:
+                  key = r.get("path") or r.get("file") or r.get("binary")
+                  out[str(key)] = r
+              return out
+
+          P, G, R = index(py), index(go), index(rs)
+          paths = sorted(set(P) & set(G) & set(R))
+          if not paths:
+              print("no shared paths; JSON key names differ")
+              print("python keys:", list(py[0].keys()) if py else None)
+              print("go keys    :", list(go[0].keys()) if go else None)
+              print("rust keys  :", list(rs[0].keys()) if rs else None)
+              sys.exit(0)
+
+          def norm(v):
+              if isinstance(v, str):
+                  return v.lower()
+              return v
+
+          disagreements = 0
+          for p in paths:
+              for field in ("pie", "nx", "canary", "relro"):
+                  vals = {
+                      "py": norm(P[p].get(field)),
+                      "go": norm(G[p].get(field)),
+                      "rs": norm(R[p].get(field)),
+                  }
+                  if len(set(map(repr, vals.values()))) > 1:
+                      disagreements += 1
+                      print(f"DISAGREE {p} [{field}]: {vals}")
+
+          print(f"\n{disagreements} disagreement(s) across {len(paths)} binaries")
+          PY
