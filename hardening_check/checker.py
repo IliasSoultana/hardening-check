@@ -22,14 +22,36 @@ class HardeningResult:
 
 
 def _check_pie(elf: ELFFile) -> bool:
-    return elf.header.e_type == "ET_DYN"
+    """Position-independent executable.
+
+    Every shared library is ET_DYN, so the header type alone is not enough --
+    testing it in isolation reports libz.so.1 and friends as PIE. DF_1_PIE is
+    what distinguishes a PIE from a plain shared object; a PT_INTERP segment
+    is the fallback for toolchains that do not emit the flag.
+    """
+    if elf.header.e_type != "ET_DYN":
+        return False
+
+    dynamic = elf.get_section_by_name(".dynamic")
+    if dynamic is not None:
+        for tag in dynamic.iter_tags():
+            if tag.entry.d_tag == "DT_FLAGS_1" and tag.entry.d_val & 0x08000000:
+                return True  # DF_1_PIE
+
+    return any(seg.header.p_type == "PT_INTERP" for seg in elf.iter_segments())
 
 
-def _check_nx(elf: ELFFile) -> bool:
+def _check_nx(elf: ELFFile) -> bool | None:
+    """Non-executable stack.
+
+    Returns None when the image carries no PT_GNU_STACK segment at all: the
+    kernel default then applies and the file alone cannot answer. Reporting
+    that as False overstates the finding.
+    """
     for segment in elf.iter_segments():
         if segment.header.p_type == "PT_GNU_STACK":
             return not bool(segment.header.p_flags & 0x1)  # PF_X
-    return False
+    return None
 
 
 def _check_canary(elf: ELFFile) -> bool:

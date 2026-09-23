@@ -17,9 +17,12 @@ from test_checker import ELFBuilder
 
 @pytest.fixture
 def weak_elf(tmp_path):
-    """A PIE binary with no NX, no canary and no RELRO — scores 1/4."""
+    """PIE, but no NX, no canary and no RELRO — scores 1/4.
+
+    PT_INTERP is what makes this a PIE rather than a plain shared object.
+    """
     path = tmp_path / "weak.elf"
-    path.write_bytes(ELFBuilder(pie=True).build().getvalue())
+    path.write_bytes(ELFBuilder(pie=True).add_interp().build().getvalue())
     return str(path)
 
 
@@ -29,6 +32,7 @@ def hardened_elf(tmp_path):
     path = tmp_path / "hardened.elf"
     builder = (
         ELFBuilder(pie=True)
+        .add_interp()
         .add_gnu_stack(executable=False)
         .add_gnu_relro()
     )

@@ -89,8 +89,17 @@ jobs:
               sys.exit(0)
 
           def norm(v):
+              # The Go implementation encodes the tri-state NX as "yes"/"no"/
+              # "unknown" strings where Python and Rust use true/false/null.
+              # Same semantics, different JSON; normalise before comparing.
               if isinstance(v, str):
-                  return v.lower()
+                  v = v.lower()
+                  if v == "yes":
+                      return True
+                  if v == "no":
+                      return False
+                  if v == "unknown":
+                      return None
               return v
 
           disagreements = 0
@@ -106,4 +115,7 @@ jobs:
                       print(f"DISAGREE {p} [{field}]: {vals}")
 
           print(f"\n{disagreements} disagreement(s) across {len(paths)} binaries")
+          if disagreements:
+              print("::error::implementations disagree; one of them is wrong")
+              sys.exit(1)
           PY

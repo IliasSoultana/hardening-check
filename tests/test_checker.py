@@ -38,6 +38,10 @@ class ELFBuilder:
         self.segments.append({"p_type": 0x6474E551, "p_flags": flags})  # PT_GNU_STACK
         return self
 
+    def add_interp(self) -> "ELFBuilder":
+        self.segments.append({"p_type": 0x3, "p_flags": 0x4})  # PT_INTERP
+        return self
+
     def add_gnu_relro(self) -> "ELFBuilder":
         self.segments.append({"p_type": 0x6474E552, "p_flags": 0x4})  # PT_GNU_RELRO
         return self
@@ -103,8 +107,15 @@ def _elf(builder: ELFBuilder):
 
 
 def test_pie_detected():
-    elf = _elf(ELFBuilder(pie=True))
+    """ET_DYN plus PT_INTERP is a PIE."""
+    elf = _elf(ELFBuilder(pie=True).add_interp())
     assert _check_pie(elf) is True
+
+
+def test_shared_library_is_not_pie():
+    """ET_DYN with neither DF_1_PIE nor PT_INTERP is a plain shared object."""
+    elf = _elf(ELFBuilder(pie=True))
+    assert _check_pie(elf) is False
 
 
 def test_no_pie_detected():
@@ -122,9 +133,10 @@ def test_nx_disabled():
     assert _check_nx(elf) is False
 
 
-def test_nx_no_segment_returns_false():
+def test_nx_no_segment_is_unknown():
+    """No PT_GNU_STACK means the kernel default applies -- not that NX is off."""
     elf = _elf(ELFBuilder())  # no GNU_STACK segment
-    assert _check_nx(elf) is False
+    assert _check_nx(elf) is None
 
 
 def test_relro_none():
@@ -156,6 +168,7 @@ def test_analyze_returns_hardening_result(tmp_path):
     # Build a minimal PIE + NX + canary + partial RELRO binary
     builder = (
         ELFBuilder(pie=True)
+        .add_interp()
         .add_gnu_stack(executable=False)
         .add_gnu_relro()
     )

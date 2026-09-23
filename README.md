@@ -97,8 +97,8 @@ Everything is read straight from the ELF structure with
 
 | Check | Detection method |
 |---|---|
-| PIE | `e_type == ET_DYN` in the ELF header |
-| NX | `PT_GNU_STACK` segment present without the `PF_X` bit |
+| PIE | `ET_DYN` **and** `DF_1_PIE`, or a `PT_INTERP` segment as fallback |
+| NX | `PT_GNU_STACK` present without `PF_X`; `null` when the segment is absent |
 | Canary | `__stack_chk_fail` in `.dynsym` |
 | RELRO | `PT_GNU_RELRO` segment (Partial), plus `DT_BIND_NOW` / `DF_BIND_NOW` (Full) |
 
@@ -112,10 +112,9 @@ Worth knowing before trusting the output:
   report identically here. The
   [LLVM pass](https://github.com/IliasSoultana/llvm-hardeningpass) exists to
   answer that question per function, at IR level.
-- **A missing `PT_GNU_STACK` reads as NX disabled.** In reality the kernel
-  default then applies, which on modern Linux is non-executable. The file
-  alone cannot distinguish "explicitly executable" from "unspecified", and
-  this implementation resolves the ambiguity pessimistically.
+- **NX is tri-state.** A missing `PT_GNU_STACK` segment reports `null`, not
+  `false`: the kernel default then applies and the file alone cannot answer.
+  Treating "unspecified" as "disabled" overstates the finding.
 - **Static binaries hide their canary.** The check reads `.dynsym`, so a
   statically linked binary with a canary can report `NO`.
 - **Not a security verdict.** The score counts mitigations; it says nothing
@@ -143,4 +142,8 @@ Same question, asked three more ways:
 - [elfharden-rs](https://github.com/IliasSoultana/elfharden-rs) — Rust, `goblin`
 - [llvm-hardeningpass](https://github.com/IliasSoultana/llvm-hardeningpass) — before linking, at IR level
 
-The three scanners are cross-checked against the same binaries and agree.
+A [differential workflow](.github/workflows/differential.yml) runs all three
+over the same corpus on every push -- executables, shared libraries and the
+loader -- and fails if any field disagrees. That check is what caught this
+implementation reporting every shared library as PIE, because `ET_DYN` alone
+does not distinguish a PIE from an ordinary `.so`.
