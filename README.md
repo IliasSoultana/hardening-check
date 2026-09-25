@@ -3,7 +3,7 @@
 [![CI](https://github.com/IliasSoultana/hardening-check/actions/workflows/ci.yml/badge.svg)](https://github.com/IliasSoultana/hardening-check/actions/workflows/ci.yml)
 
 Parses ELF binaries and reports which exploit mitigations they were actually
-compiled with — PIE, NX, stack canary and RELRO — as a table for humans or as
+compiled with (PIE, NX, stack canary and RELRO), as a table for humans or as
 JSON for a pipeline.
 
 ## Why this exists
@@ -20,7 +20,7 @@ bug is an inconvenience or an exploit:
 | **RELRO** | Relocation read-only | A writable GOT turns one arbitrary write into control-flow hijack |
 
 Build systems drift. A flag gets dropped from one target, a vendored
-dependency ships prebuilt, a release path differs from the debug path — and
+dependency ships prebuilt, a release path differs from the debug path, and
 nothing fails, because a missing mitigation is silent. This makes it loud.
 
 ## Install
@@ -92,7 +92,7 @@ builds:
 ## How it works
 
 Everything is read straight from the ELF structure with
-[`pyelftools`](https://github.com/eliben/pyelftools) — no `checksec`, no
+[`pyelftools`](https://github.com/eliben/pyelftools), no `checksec`, no
 `readelf`, no shelling out.
 
 | Check | Detection method |
@@ -131,19 +131,19 @@ uv run pytest -q
 Unit tests build synthetic ELF headers in memory with a small `ELFBuilder`, so
 each check is exercised against known-good byte layouts without committing
 fixture binaries. CI additionally scans the runner's real system binaries and
-verifies the gate on a deliberately weak binary — fixtures agree with the
+verifies the gate on a deliberately weak binary. Fixtures agree with the
 parser too easily.
 
 ## Related
 
 Same question, asked three more ways:
 
-- [elfharden](https://github.com/IliasSoultana/elfharden) — Go, `debug/elf`
-- [elfharden-rs](https://github.com/IliasSoultana/elfharden-rs) — Rust, `goblin`
-- [llvm-hardeningpass](https://github.com/IliasSoultana/llvm-hardeningpass) — before linking, at IR level
+- [elfharden](https://github.com/IliasSoultana/elfharden), Go, `debug/elf`
+- [elfharden-rs](https://github.com/IliasSoultana/elfharden-rs), Rust, `goblin`
+- [llvm-hardeningpass](https://github.com/IliasSoultana/llvm-hardeningpass), before linking, at IR level
 
 A [differential workflow](.github/workflows/differential.yml) runs all three
-over the same corpus on every push -- executables, shared libraries and the
-loader -- and fails if any field disagrees. That check is what caught this
+over the same corpus on every push (executables, shared libraries and the
+loader) and fails if any field disagrees. That check is what caught this
 implementation reporting every shared library as PIE, because `ET_DYN` alone
 does not distinguish a PIE from an ordinary `.so`.

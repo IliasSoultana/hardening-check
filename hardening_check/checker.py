@@ -1,4 +1,4 @@
-"""ELF binary hardening checker — PIE, NX, stack canary, RELRO."""
+"""ELF binary hardening checker, PIE, NX, stack canary, RELRO."""
 
 from __future__ import annotations
 

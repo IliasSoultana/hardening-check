@@ -74,7 +74,7 @@ def render_table(results: list[HardeningResult]) -> None:
 
     for r in results:
         if not r.is_elf:
-            note = f"[dim]not an ELF{' — ' + r.error if r.error else ''}[/dim]"
+            note = f"[dim]not an ELF{', ' + r.error if r.error else ''}[/dim]"
             table.add_row(r.path, note, "", "", "", "")
             continue
         if r.error:
@@ -95,10 +95,10 @@ def render_table(results: list[HardeningResult]) -> None:
 
 def _print_legend() -> None:
     console.print(
-        "\n[dim]PIE[/dim]    Position-Independent Executable — ASLR-compatible\n"
-        "[dim]NX[/dim]     Non-Executable stack — prevents shellcode on stack\n"
-        "[dim]Canary[/dim] Stack canary — detects stack buffer overflows\n"
-        "[dim]RELRO[/dim]  Relocation Read-Only — protects GOT from overwrites\n"
+        "\n[dim]PIE[/dim]    Position-Independent Executable, ASLR-compatible\n"
+        "[dim]NX[/dim]     Non-Executable stack, prevents shellcode on stack\n"
+        "[dim]Canary[/dim] Stack canary, detects stack buffer overflows\n"
+        "[dim]RELRO[/dim]  Relocation Read-Only, protects GOT from overwrites\n"
     )
 
 

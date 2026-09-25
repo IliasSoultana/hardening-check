@@ -17,7 +17,7 @@ from test_checker import ELFBuilder
 
 @pytest.fixture
 def weak_elf(tmp_path):
-    """PIE, but no NX, no canary and no RELRO — scores 1/4.
+    """PIE, but no NX, no canary and no RELRO, scores 1/4.
 
     PT_INTERP is what makes this a PIE rather than a plain shared object.
     """
@@ -28,7 +28,7 @@ def weak_elf(tmp_path):
 
 @pytest.fixture
 def hardened_elf(tmp_path):
-    """PIE + NX + canary + full RELRO — scores 4/4."""
+    """PIE + NX + canary + full RELRO, scores 4/4."""
     path = tmp_path / "hardened.elf"
     builder = (
         ELFBuilder(pie=True)
@@ -55,7 +55,7 @@ def test_gate_fails_below_threshold(weak_elf, capsys):
 
 
 def test_gate_passes_at_threshold(weak_elf):
-    """Score 1 with a threshold of 1 passes — the check is `<`, not `<=`."""
+    """Score 1 with a threshold of 1 passes, the check is `<`, not `<=`."""
     main(["--fail-under", "1", weak_elf])
 
 

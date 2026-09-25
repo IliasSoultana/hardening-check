@@ -37,7 +37,7 @@ jobs:
         run: |
           set -e
           # The function needs a stack buffer, otherwise -fstack-protector-strong
-          # has nothing to protect and emits no canary -- which would make the
+          # has nothing to protect and emits no canary, which would make the
           # "hardened" binary score 3/4 and fail its own gate.
           cat > sample.c <<'SRC'
           #include <string.h>

@@ -134,7 +134,7 @@ def test_nx_disabled():
 
 
 def test_nx_no_segment_is_unknown():
-    """No PT_GNU_STACK means the kernel default applies -- not that NX is off."""
+    """No PT_GNU_STACK means the kernel default applies, not that NX is off."""
     elf = _elf(ELFBuilder())  # no GNU_STACK segment
     assert _check_nx(elf) is None
 
